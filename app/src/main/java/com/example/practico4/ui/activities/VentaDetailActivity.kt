@@ -13,9 +13,11 @@ import com.example.practico4.dal.conn.AppDatabase
 import com.example.practico4.dal.dto.Venta
 import com.example.practico4.dal.dto.VentaProducto
 import com.example.practico4.databinding.ActivityVentaDetailBinding
+import com.example.practico4.models.VentaApi
+import com.example.practico4.repositories.VentaRepository
 import com.example.practico4.ui.adapters.ProductoVentaListAdapter
 
-class VentaDetailActivity : AppCompatActivity() {
+class VentaDetailActivity : AppCompatActivity(), VentaRepository.VentaApiUpdateListener {
     private lateinit var binding: ActivityVentaDetailBinding
     private lateinit var db: AppDatabase
     private var idVenta: Int = -1
@@ -36,7 +38,6 @@ class VentaDetailActivity : AppCompatActivity() {
 
         setupEventListeners()
         setupRecyclerView()
-
     }
 
     private fun setupRecyclerView() {
@@ -134,12 +135,16 @@ class VentaDetailActivity : AppCompatActivity() {
             return
         }
 
+        val venta = Venta(
+            nombre,
+            nit.toLong(),
+            usuario
+        )
+
         if (idVenta != -1) {
-            val venta = db.ventaDao().getById(idVenta)
-            venta.nombre = nombre
-            venta.nit = nit.toLong()
-            venta.usuario = usuario
-            db.ventaDao().update(venta)
+            val ventaProductos = db.ventaDao().getVentaProductos(idVenta)
+            venta.ventaId = idVenta
+            VentaRepository.updateVenta(venta, this, true)
         } else {
             val venta = Venta(
                 nombre,
@@ -153,9 +158,9 @@ class VentaDetailActivity : AppCompatActivity() {
 
     private fun loadForm() {
         val venta = db.ventaDao().getById(idVenta)
-        binding.txtNombreVenta.editText?.setText(venta.nombre)
-        binding.txtNitVenta.editText?.setText(venta.nit.toString())
-        binding.txtUsuarioVenta.editText?.setText(venta.usuario)
+        binding.txtNombreVenta.editText?.setText(venta?.nombre)
+        binding.txtNitVenta.editText?.setText(venta?.nit.toString())
+        binding.txtUsuarioVenta.editText?.setText(venta?.usuario)
     }
 
     private fun validarAgregarProducto(
@@ -199,5 +204,13 @@ class VentaDetailActivity : AppCompatActivity() {
         }
 
         return true
+    }
+
+    override fun onVentaUpdateSuccess(venta: VentaApi, toast: Boolean) {
+        TODO("Not yet implemented")
+    }
+
+    override fun onVentaUpdateError(error: Throwable) {
+        TODO("Not yet implemented")
     }
 }

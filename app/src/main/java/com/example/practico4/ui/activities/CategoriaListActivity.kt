@@ -12,13 +12,14 @@ import com.example.practico4.dal.conn.AppDatabase
 import com.example.practico4.dal.dto.Categoria
 import com.example.practico4.databinding.ActivityCategoriaListBinding
 import com.example.practico4.models.CategoriaApi
+import com.example.practico4.models.DeleteResponse
 import com.example.practico4.repositories.CategoriaRepository
 import com.example.practico4.repositories.RetrofitRepository
 import com.example.practico4.ui.adapters.CategoriaListAdapter
 import java.text.SimpleDateFormat
 
 class CategoriaListActivity : AppCompatActivity(), CategoriaListAdapter.CategoriaListListener,
-    CategoriaRepository.CategoriaListListener {
+    CategoriaRepository.CategoriaApiListener {
 
     private lateinit var binding: ActivityCategoriaListBinding
     private lateinit var db: AppDatabase
@@ -72,11 +73,8 @@ class CategoriaListActivity : AppCompatActivity(), CategoriaListAdapter.Categori
         builder.setView(input)
         builder.setPositiveButton("Añadir") { dialog, _ ->
             if (input.text.toString().isNotBlank()) {
-                val categoria = Categoria(input.text.toString())
-                val fecha = formatter.format(Calendar.getInstance().time).toString()
-                categoria.created_at = fecha
-                categoria.updated_at = fecha
-                db.categoriaDao().insert(categoria).toString()
+                val aux = Categoria(input.text.toString())
+                CategoriaRepository.insertCategoria(aux, this)
                 reloadList()
             } else {
                 dialog.cancel()
@@ -90,7 +88,6 @@ class CategoriaListActivity : AppCompatActivity(), CategoriaListAdapter.Categori
         builder.setNegativeButton("Cancelar") { dialog, which -> dialog.cancel() }
         builder.show()
     }
-
 
     private fun insertCategoriasPorInsertar(lista: ArrayList<Categoria>) {
         lista.forEach {
@@ -109,9 +106,14 @@ class CategoriaListActivity : AppCompatActivity(), CategoriaListAdapter.Categori
             categoria.updated_at = categoriaApi.updated_at
             db.categoriaDao().update(categoria)
         } else {
-            categoriaApi.nombre = categoria.nombre
-            categoriaApi.updated_at = categoria.updated_at
-            RetrofitRepository.updateCategoria(categoriaApi, this)
+            CategoriaRepository.updateCategoria(categoria, this, false)
+        }
+    }
+
+    private fun verificarDelete(ids : ArrayList<Int>){
+        val listCategoria = db.categoriaDao().getCategoriaByNotIn(ids)
+        listCategoria.forEach {
+            db.categoriaDao().delete(it)
         }
     }
 
@@ -124,8 +126,7 @@ class CategoriaListActivity : AppCompatActivity(), CategoriaListAdapter.Categori
         builder.setPositiveButton("Guardar") { dialog, _ ->
             if (input.text.toString().isNotBlank()) {
                 categoria.nombre = input.text.toString()
-                categoria.updated_at = formatter.format(Calendar.getInstance().time).toString()
-                db.categoriaDao().update(categoria)
+                CategoriaRepository.updateCategoria(categoria, this, true)
                 reloadList()
             } else {
                 dialog.cancel()
@@ -142,6 +143,7 @@ class CategoriaListActivity : AppCompatActivity(), CategoriaListAdapter.Categori
 
     override fun onCategoriaDeleteClick(categoria: Categoria) {
         db.categoriaDao().delete(categoria)
+        categoria.id?.let { CategoriaRepository.deleteCategoria(it, this) }
         reloadList()
     }
 
@@ -167,8 +169,10 @@ class CategoriaListActivity : AppCompatActivity(), CategoriaListAdapter.Categori
 
     override fun onCategoriaListFetched(list: List<CategoriaApi>) {
         val categoriasPorInsertar = ArrayList<Categoria>()
+        val idCategoriasApi = ArrayList<Int>()
         for (categoria in list) {
             val categoriaDB = Categoria(categoria.nombre)
+            idCategoriasApi.add(categoria.id)
             categoriaDB.id = categoria.id
             categoriaDB.created_at = categoria.created_at
             categoriaDB.updated_at = categoria.updated_at
@@ -178,28 +182,65 @@ class CategoriaListActivity : AppCompatActivity(), CategoriaListAdapter.Categori
                 val categoriaPorInsertar = db.categoriaDao().getById(categoria.id)
 
                 if (categoriaDB.created_at == categoriaPorInsertar?.created_at
-                    && categoriaDB.updated_at == categoriaPorInsertar.updated_at
-                ) {
+                    && categoriaDB.updated_at == categoriaPorInsertar.updated_at) {
                     continue
-                } else if (categoriaDB.created_at == categoriaPorInsertar?.created_at
-                    && categoriaDB.updated_at != categoriaPorInsertar.updated_at
-                ) {
-                    // verificar cual de las fechas es mas reciente
-
                 }
 
-
+                if (categoriaDB.updated_at != categoriaPorInsertar?.updated_at && categoriaDB.created_at == categoriaPorInsertar?.created_at) {
+                    verificarActualizacion(categoria, categoriaPorInsertar)
+                    continue
+                }
 
                 categoriaPorInsertar?.nombre?.let { Categoria(it) }
                     ?.let { categoriasPorInsertar.add(it) }
                 db.categoriaDao().update(categoriaDB)
             }
         }
+        verificarDelete(idCategoriasApi)
         insertCategoriasPorInsertar(categoriasPorInsertar)
         reloadList()
     }
 
     override fun onCategoriaListFetchError(error: Throwable) {
-        Log.d("CATEGORIA_LIST", error.toString())
+        Toast.makeText(this, "Error al obtener las categorias", Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onCategoriaUpdateSuccess(categoriaApi: CategoriaApi, toast: Boolean) {
+        if (toast) {
+            val categoria = Categoria(categoriaApi.nombre)
+            categoria.id = categoriaApi.id
+            categoria.created_at = categoriaApi.created_at
+            categoria.updated_at = categoriaApi.updated_at
+            db.categoriaDao().update(categoria)
+            reloadList()
+            Toast.makeText(this, "Se ha actualizado la categoria correctamente", Toast.LENGTH_SHORT).show()
+        } else {
+            Log.d("CategoriaListActivity", "Categoria actualizada: $categoriaApi")
+        }
+    }
+
+    override fun onCategoriaUpdateError(error: Throwable) {
+        Log.d("CategoriaListActivity", "Error al actualizar la categoria: $error")
+    }
+
+    override fun onCategoriaInsertSuccess(categoriaApi: CategoriaApi) {
+        val categoria = Categoria(categoriaApi.nombre)
+        categoria.id = categoriaApi.id
+        categoria.created_at = categoriaApi.created_at
+        categoria.updated_at = categoriaApi.updated_at
+        db.categoriaDao().insert(categoria)
+        reloadList()
+    }
+
+    override fun onCategoriaInsertError(error: Throwable) {
+        Toast.makeText(this, "Error al insertar la categoria", Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onCategoriaDeleteSuccess(respuesta: DeleteResponse) {
+        Toast.makeText(this, "Se ha eliminado la categoria correctamente", Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onCategoriaDeleteError(error: Throwable) {
+        Toast.makeText(this, "Error al eliminar la categoria", Toast.LENGTH_SHORT).show()
     }
 }

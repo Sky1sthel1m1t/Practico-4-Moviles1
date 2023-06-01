@@ -3,7 +3,9 @@ package com.example.practico4.api
 
 import com.example.practico4.dal.dto.Categoria
 import com.example.practico4.models.CategoriaApi
+import com.example.practico4.models.DeleteResponse
 import retrofit2.Call
+import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -15,11 +17,11 @@ interface CategoriaService {
     fun getCategoriasList(): Call<List<CategoriaApi>>
 
     @POST("categorias")
-    fun insertCategoria(): Call<Categoria>
+    fun insertCategoria(@Body categoria: Categoria): Call<CategoriaApi>
 
     @PUT("categorias/{id}")
-    fun editCategoria(@Path("id") int: Int): Call<Categoria>
+    fun editCategoria(@Path("id") int: Int, @Body categoria: Categoria): Call<CategoriaApi>
 
     @DELETE("categorias/{id}")
-    fun deleteCategoria(): Call<Categoria>
+    fun deleteCategoria(@Path("id") int: Int): Call<DeleteResponse>
 }

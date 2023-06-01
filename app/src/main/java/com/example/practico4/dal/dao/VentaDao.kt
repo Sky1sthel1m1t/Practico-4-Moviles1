@@ -11,7 +11,7 @@ interface VentaDao {
     fun getAll(): List<Venta>
 
     @Query("SELECT * FROM venta WHERE ventaId = :id")
-    fun getById(id: Int): Venta
+    fun getById(id: Int): Venta?
 
     @Query("SELECT * FROM venta")
     fun getAllWithProductos(): VentaConDetalle
@@ -27,6 +27,9 @@ interface VentaDao {
 
     @Query("DELETE FROM ventaproducto WHERE ventaId = :ventaId AND productoId = :productoId")
     fun deleteProductoEnVenta(ventaId: Int, productoId: Int) : Int
+
+    @Query("SELECT * FROM venta WHERE ventaId NOT IN (:ids)")
+    fun getVentaByNotIn(ids: List<Int>): List<Venta>
 
     @Insert
     fun insertProductoVendido(ventaProductos: VentaProducto)
@@ -45,5 +48,6 @@ interface VentaDao {
 
     @Delete
     fun delete(venta: Venta)
+
 
 }

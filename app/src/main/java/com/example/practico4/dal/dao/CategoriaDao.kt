@@ -15,6 +15,9 @@ interface CategoriaDao {
     @Query("SELECT id FROM categoria")
     fun getAllId(): List<Int>
 
+    @Query("SELECT * FROM categoria WHERE id NOT IN (:ids)")
+    fun getCategoriaByNotIn(ids: List<Int>): List<Categoria>
+
     @Transaction
     @Query("SELECT * FROM categoria WHERE id = (:id)")
     fun getCategoriaProducto(id: Int): CategoriaConProducto

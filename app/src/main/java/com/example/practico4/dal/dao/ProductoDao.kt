@@ -1,6 +1,7 @@
 package com.example.practico4.dal.dao
 
 import androidx.room.*
+import com.example.practico4.dal.dto.Categoria
 import com.example.practico4.dal.dto.Producto
 import com.example.practico4.dal.dto.ProductoConCategoria
 
@@ -11,6 +12,9 @@ interface ProductoDao {
 
     @Query("SELECT * FROM producto WHERE productoId = (:id)")
     fun getById(id: Int): Producto?
+
+    @Query("SELECT * FROM producto WHERE productoId NOT IN (:ids)")
+    fun getProductoByNotIn(ids: List<Int>): List<Producto>
 
     @Transaction
     @Query("SELECT * FROM producto")
