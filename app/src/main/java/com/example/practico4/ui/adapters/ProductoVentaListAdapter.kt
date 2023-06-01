@@ -6,11 +6,11 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.example.practico4.R
 import com.example.practico4.dal.conn.AppDatabase
-import com.example.practico4.dal.dto.VentaProducto
 import com.example.practico4.databinding.ProductoventaListItemBinding
+import com.example.practico4.models.DetalleInsert
 
 class ProductoVentaListAdapter(
-    val detalle: List<VentaProducto>,
+    var detalle: List<DetalleInsert>,
     val db: AppDatabase
 ) :
     RecyclerView.Adapter<ProductoVentaListAdapter.ProductoVentaViewHolder>() {
@@ -27,11 +27,16 @@ class ProductoVentaListAdapter(
 
     override fun onBindViewHolder(holder: ProductoVentaViewHolder, position: Int) {
         val detalle = this.detalle[position]
-        val producto = db.productoDao().getById(detalle.productoId)
+        val producto = db.productoDao().getById(detalle.id)
 
         holder.binding.lbCantidadProductoVenta.text = detalle.cantidad.toString()
         holder.binding.lbPrecioProductoVenta.text = detalle.precio.toString()
         holder.binding.lbNombreProductoVenta.text = producto?.nombre
+    }
+
+    fun reload(detalles : List<DetalleInsert>) {
+        this.detalle = detalles
+        notifyDataSetChanged()
     }
 
     class ProductoVentaViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {

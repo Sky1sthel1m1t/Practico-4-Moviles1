@@ -86,8 +86,7 @@
         android:id="@+id/btnAgregarProducto"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Agregar producto"
-        android:visibility="invisible" />
+        android:text="Agregar producto" />
 
     <Button
         android:id="@+id/btnGuardarVenta"

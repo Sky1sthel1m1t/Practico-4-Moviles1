@@ -3,6 +3,7 @@ package com.example.practico4.repositories
 import com.example.practico4.api.VentaService
 import com.example.practico4.dal.dto.Venta
 import com.example.practico4.models.VentaApi
+import com.example.practico4.models.VentaApiInsert
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -31,22 +32,23 @@ object VentaRepository {
         })
     }
 
-    fun insertVenta(venta: Venta, listener: VentaApiDetailListener) {
+    fun insertVenta(venta: VentaApiInsert, listener: VentaApiInsertListener) {
         ventaService.insertVenta(venta).enqueue(object : Callback<VentaApi> {
             override fun onResponse(
                 call: Call<VentaApi>,
                 response: Response<VentaApi>
             ) {
+                print("")
                 if (response.isSuccessful) {
                     val venta = response.body()
                     venta?.let {
-                        listener.onVentaDetailFetched(it)
+                        listener.onVentaInsert(it)
                     }
                 }
             }
 
             override fun onFailure(call: Call<VentaApi>, t: Throwable) {
-                listener.onVentaDetailFetchError(t)
+                listener.onVentaInsertError(t)
             }
         })
     }
@@ -79,9 +81,9 @@ object VentaRepository {
         fun onVentaListFetchError(error: Throwable)
     }
 
-    interface VentaApiDetailListener {
-        fun onVentaDetailFetched(venta: VentaApi)
-        fun onVentaDetailFetchError(error: Throwable)
+    interface VentaApiInsertListener {
+        fun onVentaInsert(venta: VentaApi)
+        fun onVentaInsertError(error: Throwable)
     }
 
     interface VentaApiUpdateListener {

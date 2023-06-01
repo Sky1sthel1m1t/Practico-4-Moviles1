@@ -77,9 +77,10 @@ class VentaListActivity : AppCompatActivity(), VentaListAdapter.VentaListListene
         val ventasPorInsertar = ArrayList<Venta>()
         val idsVentasApi = ArrayList<Int>()
         for (ventaApi in ventas) {
+            val nitString = ventaApi.nit.toString().toLong()
             val ventaDb = Venta(
                 ventaApi.nombre,
-                ventaApi.nit.toLong(),
+                nitString,
                 ventaApi.usuario
             )
             ventaDb.ventaId = ventaApi.id
@@ -143,14 +144,14 @@ class VentaListActivity : AppCompatActivity(), VentaListAdapter.VentaListListene
     }
 
     override fun onVentaListFetchError(error: Throwable) {
-        TODO("Not yet implemented")
+//        TODO("Not yet implemented")
     }
 
     override fun onVentaUpdateSuccess(venta: VentaApi, toast: Boolean) {
-        TODO("Not yet implemented")
+//        TODO("Not yet implemented")
     }
 
     override fun onVentaUpdateError(error: Throwable) {
-        TODO("Not yet implemented")
+//        TODO("Not yet implemented")
     }
 }

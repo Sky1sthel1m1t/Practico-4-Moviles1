@@ -13,15 +13,17 @@ import com.example.practico4.dal.conn.AppDatabase
 import com.example.practico4.dal.dto.Venta
 import com.example.practico4.dal.dto.VentaProducto
 import com.example.practico4.databinding.ActivityVentaDetailBinding
+import com.example.practico4.models.DetalleInsert
 import com.example.practico4.models.VentaApi
+import com.example.practico4.models.VentaApiInsert
 import com.example.practico4.repositories.VentaRepository
 import com.example.practico4.ui.adapters.ProductoVentaListAdapter
 
-class VentaDetailActivity : AppCompatActivity(), VentaRepository.VentaApiUpdateListener {
+class VentaDetailActivity : AppCompatActivity(), VentaRepository.VentaApiUpdateListener, VentaRepository.VentaApiInsertListener {
     private lateinit var binding: ActivityVentaDetailBinding
     private lateinit var db: AppDatabase
     private var idVenta: Int = -1
-    private var productosLateAdd = ArrayList<VentaProducto>()
+    private var ventaProducto = ArrayList<DetalleInsert>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,31 +35,34 @@ class VentaDetailActivity : AppCompatActivity(), VentaRepository.VentaApiUpdateL
 
         if (idVenta != -1) {
             loadForm()
-            binding.btnAgregarProducto.visibility = View.VISIBLE
+            binding.btnAgregarProducto.visibility = View.INVISIBLE
         }
 
         setupEventListeners()
         setupRecyclerView()
     }
 
+    override fun onResume() {
+        super.onResume()
+        reloadList()
+    }
+
     private fun setupRecyclerView() {
-        var lista = ArrayList<VentaProducto>()
-        if (idVenta != -1) {
-            lista = db.ventaDao().getVentaProductos(idVenta) as ArrayList<VentaProducto>
-        }
+        var lista = ArrayList<DetalleInsert>()
         binding.rvProductosVenta.apply {
             adapter = ProductoVentaListAdapter(lista, db)
             layoutManager = LinearLayoutManager(this@VentaDetailActivity)
         }
     }
 
+    private fun reloadList(){
+        binding.rvProductosVenta.adapter?.let {
+            (it as ProductoVentaListAdapter).reload(ventaProducto)
+        }
+    }
+
     private fun setupEventListeners() {
         binding.btnCancelVenta.setOnClickListener {
-            if (productosLateAdd.size > 0){
-                for (producto in productosLateAdd){
-                    db.ventaDao().deleteProductoEnVenta(idVenta, producto.productoId)
-                }
-            }
             finish()
         }
         binding.btnGuardarVenta.setOnClickListener {
@@ -105,15 +110,13 @@ class VentaDetailActivity : AppCompatActivity(), VentaRepository.VentaApiUpdateL
             val precio = txtPrecio.text.toString().toDouble()
 
             if (db.productoDao().getById(idProducto) != null) {
-                val ventaProducto = VentaProducto(
-                    idVenta,
+                val detalleApi = DetalleInsert(
                     idProducto,
                     cantidad,
                     precio
                 )
-                productosLateAdd.add(ventaProducto)
-                db.ventaDao().insertProductoVendido(ventaProducto)
-                setupRecyclerView()
+                ventaProducto.add(detalleApi)
+                reloadList()
             } else {
                 Toast.makeText(
                     this,
@@ -142,22 +145,33 @@ class VentaDetailActivity : AppCompatActivity(), VentaRepository.VentaApiUpdateL
         )
 
         if (idVenta != -1) {
-            val ventaProductos = db.ventaDao().getVentaProductos(idVenta)
             venta.ventaId = idVenta
             VentaRepository.updateVenta(venta, this, true)
         } else {
-            val venta = Venta(
-                nombre,
-                nit.toLong(),
-                usuario
+            val ventaApi = VentaApiInsert(
+                venta.nombre,
+                venta.nit.toString(),
+                venta.usuario,
+                ventaProducto
             )
-            db.ventaDao().insert(venta)
+            VentaRepository.insertVenta(ventaApi, this)
         }
         finish()
     }
 
     private fun loadForm() {
         val venta = db.ventaDao().getById(idVenta)
+        val productos = db.ventaDao().getVentaProductos(idVenta)
+
+        productos.forEach{
+            val detalleApi = DetalleInsert(
+                it.productoId,
+                it.cantidad,
+                it.precio
+            )
+            ventaProducto.add(detalleApi)
+        }
+
         binding.txtNombreVenta.editText?.setText(venta?.nombre)
         binding.txtNitVenta.editText?.setText(venta?.nit.toString())
         binding.txtUsuarioVenta.editText?.setText(venta?.usuario)
@@ -207,10 +221,51 @@ class VentaDetailActivity : AppCompatActivity(), VentaRepository.VentaApiUpdateL
     }
 
     override fun onVentaUpdateSuccess(venta: VentaApi, toast: Boolean) {
-        TODO("Not yet implemented")
+        val ventadb = Venta(
+            venta.nombre,
+            venta.nit.toLong(),
+            venta.usuario
+        )
+        ventadb.ventaId = venta.id
+        ventadb.created_at = venta.created_at
+        ventadb.updated_at = venta.updated_at
+        db.ventaDao().update(ventadb)
+        if (toast) {
+            Toast.makeText(this, "Venta actualizada con exito", Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onVentaUpdateError(error: Throwable) {
+        TODO("Not yet implemented")
+    }
+
+    override fun onVentaInsert(venta: VentaApi) {
+        val ventadb = Venta(
+            venta.nombre,
+            venta.nit.toLong(),
+            venta.usuario
+        )
+        ventadb.ventaId = venta.id
+        ventadb.created_at = venta.created_at
+        ventadb.updated_at = venta.updated_at
+        db.ventaDao().insert(ventadb)
+        ventaProducto.forEach {
+            val ventaProducto = it.id?.let { productoId ->
+                VentaProducto(
+                    venta.id,
+                    productoId,
+                    it.cantidad,
+                    it.precio
+                )
+            }
+            if (ventaProducto != null) {
+                db.ventaDao().insertProductoVendido(ventaProducto)
+            }
+        }
+        Toast.makeText(this, "Venta registrada con exito", Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onVentaInsertError(error: Throwable) {
         TODO("Not yet implemented")
     }
 }
