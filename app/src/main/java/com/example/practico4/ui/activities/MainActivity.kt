@@ -1,9 +1,8 @@
 package com.example.practico4.ui.activities
 
 import android.content.Intent
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import com.example.practico4.R
+import androidx.appcompat.app.AppCompatActivity
 import com.example.practico4.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {

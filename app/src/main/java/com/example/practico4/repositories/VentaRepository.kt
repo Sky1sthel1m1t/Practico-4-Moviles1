@@ -2,6 +2,7 @@ package com.example.practico4.repositories
 
 import com.example.practico4.api.VentaService
 import com.example.practico4.dal.dto.Venta
+import com.example.practico4.models.DeleteResponse
 import com.example.practico4.models.VentaApi
 import com.example.practico4.models.VentaApiInsert
 import retrofit2.Call
@@ -76,9 +77,31 @@ object VentaRepository {
         }
     }
 
+    fun deleteVenta(venta: Venta, listener: VentaApiListListener, toast: Boolean) {
+        venta.ventaId?.let {
+            ventaService.deleteVenta(it)
+                .enqueue(object : Callback<DeleteResponse> {
+                    override fun onResponse(
+                        call: Call<DeleteResponse>,
+                        response: Response<DeleteResponse>
+                    ) {
+                        if (response.isSuccessful) {
+                            listener.onVentaDeleteSuccess(venta ,toast)
+                        }
+                    }
+
+                    override fun onFailure(call: Call<DeleteResponse>, t: Throwable) {
+                        listener.onVentaDeleteError(t)
+                    }
+                })
+        }
+    }
+
     interface VentaApiListListener {
         fun onVentaListFetched(ventas: List<VentaApi>)
         fun onVentaListFetchError(error: Throwable)
+        fun onVentaDeleteSuccess(venta: Venta, toast: Boolean)
+        fun onVentaDeleteError(error: Throwable)
     }
 
     interface VentaApiInsertListener {

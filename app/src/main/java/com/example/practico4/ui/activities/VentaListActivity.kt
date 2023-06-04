@@ -5,6 +5,7 @@ import android.icu.util.Calendar
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.practico4.dal.conn.AppDatabase
 import com.example.practico4.dal.dto.Venta
@@ -18,7 +19,7 @@ class VentaListActivity : AppCompatActivity(), VentaListAdapter.VentaListListene
     VentaRepository.VentaApiListListener, VentaRepository.VentaApiUpdateListener {
 
     private lateinit var binding: ActivityVentaListBinding
-    private lateinit var db : AppDatabase
+    private lateinit var db: AppDatabase
     private val formatter: SimpleDateFormat =
         SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'")
 
@@ -66,21 +67,16 @@ class VentaListActivity : AppCompatActivity(), VentaListAdapter.VentaListListene
     }
 
     override fun onVentaDeleteClick(venta: Venta) {
-        venta.ventaId?.let { Log.d("Delete", db.ventaDao().deleteProductosEnVenta(it).toString()) }
-        db.ventaDao().delete(venta)
-        binding.rvVentas.adapter?.let {
-            (it as VentaListAdapter).reload(db.ventaDao().getAll())
-        }
+        VentaRepository.deleteVenta(venta, this, true)
     }
 
     override fun onVentaListFetched(ventas: List<VentaApi>) {
         val ventasPorInsertar = ArrayList<Venta>()
         val idsVentasApi = ArrayList<Int>()
         for (ventaApi in ventas) {
-            val nitString = ventaApi.nit.toString().toLong()
             val ventaDb = Venta(
                 ventaApi.nombre,
-                nitString,
+                ventaApi.nit.toLong(),
                 ventaApi.usuario
             )
             ventaDb.ventaId = ventaApi.id
@@ -144,14 +140,29 @@ class VentaListActivity : AppCompatActivity(), VentaListAdapter.VentaListListene
     }
 
     override fun onVentaListFetchError(error: Throwable) {
-//        TODO("Not yet implemented")
+        Toast.makeText(this, "Ha habido un error al obtener la lista", Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onVentaDeleteSuccess(venta: Venta, toast: Boolean) {
+        if (toast) {
+            db.ventaDao().delete(venta)
+            Toast.makeText(this, "Venta eliminada correctamente", Toast.LENGTH_SHORT).show()
+            reloadList()
+        }
+    }
+
+    override fun onVentaDeleteError(error: Throwable) {
+        Toast.makeText(this, "Ha habido un error al eliminar la venta", Toast.LENGTH_SHORT).show()
     }
 
     override fun onVentaUpdateSuccess(venta: VentaApi, toast: Boolean) {
-//        TODO("Not yet implemented")
+        Log.d("VentaListActivity", "Venta " + venta.id + " actualizada correctamente")
     }
 
     override fun onVentaUpdateError(error: Throwable) {
-//        TODO("Not yet implemented")
+        Log.d(
+            "VentaListActivity",
+            "Ha habido un error al actualizar la venta, error: " + error.message
+        )
     }
 }

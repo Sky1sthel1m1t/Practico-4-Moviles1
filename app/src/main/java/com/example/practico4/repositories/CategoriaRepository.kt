@@ -72,7 +72,7 @@ object CategoriaRepository {
         })
     }
 
-    fun deleteCategoria(id: Int, listener: CategoriaApiListener) {
+    fun deleteCategoria(id: Int, listener: CategoriaApiListener, toast: Boolean) {
         categoriaService.deleteCategoria(id).enqueue(object : Callback<DeleteResponse> {
             override fun onResponse(
                 call: Call<DeleteResponse>,
@@ -81,7 +81,7 @@ object CategoriaRepository {
                 if (response.isSuccessful) {
                     val respuesta = response.body()
                     respuesta?.let {
-                        listener.onCategoriaDeleteSuccess(it)
+                        listener.onCategoriaDeleteSuccess(it, toast)
                     }
                 }
             }
@@ -99,7 +99,7 @@ object CategoriaRepository {
         fun onCategoriaUpdateError(error: Throwable)
         fun onCategoriaInsertSuccess(categoriaApi: CategoriaApi)
         fun onCategoriaInsertError(error: Throwable)
-        fun onCategoriaDeleteSuccess(respuesta: DeleteResponse)
+        fun onCategoriaDeleteSuccess(respuesta: DeleteResponse, toast : Boolean)
         fun onCategoriaDeleteError(error: Throwable)
     }
 }
