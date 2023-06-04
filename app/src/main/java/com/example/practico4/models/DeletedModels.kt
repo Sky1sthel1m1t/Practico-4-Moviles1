@@ -5,11 +5,12 @@ import com.example.practico4.dal.dto.Producto
 import com.example.practico4.dal.dto.Venta
 
 class DeletedModels {
+    var deletedCategorias = ArrayList<Categoria>()
+    var deletedProductos = ArrayList<Producto>()
+    var deletedVentas = ArrayList<Venta>()
+
     companion object {
         private var instance: DeletedModels? = null
-        var deletedCategorias = ArrayList<Categoria>()
-        var deletedProductos = ArrayList<Producto>()
-        var deletedVentas = ArrayList<Venta>()
 
         fun getInstance(): DeletedModels {
             if (instance == null) {

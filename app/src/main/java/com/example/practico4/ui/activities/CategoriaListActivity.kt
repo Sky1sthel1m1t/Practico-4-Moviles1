@@ -161,7 +161,7 @@ class CategoriaListActivity : AppCompatActivity(), CategoriaListAdapter.Categori
         if (isOnline(this)) {
             categoria.id?.let { CategoriaRepository.deleteCategoria(it, this, false) }
         } else {
-            DeletedModels.deletedCategorias.add(categoria)
+            DeletedModels.getInstance().deletedCategorias.add(categoria)
         }
 
         db.categoriaDao().delete(categoria)
@@ -171,7 +171,7 @@ class CategoriaListActivity : AppCompatActivity(), CategoriaListAdapter.Categori
     private fun eliminarCategoriasEliminadas(lista: List<CategoriaApi>) {
         val listaIds = lista.map { it.id }
         val ultimaFechaApi = formatter.parse(lista.last().created_at)
-        DeletedModels.deletedCategorias.forEach {
+        DeletedModels.getInstance().deletedCategorias.forEach {
             if (listaIds.contains(it.id)) {
                 val fechaCategoria = formatter.parse(it.created_at)
                 if (fechaCategoria.before(ultimaFechaApi)) {
@@ -179,7 +179,7 @@ class CategoriaListActivity : AppCompatActivity(), CategoriaListAdapter.Categori
                 }
             }
         }
-        DeletedModels.deletedCategorias.clear()
+        DeletedModels.getInstance().deletedCategorias.clear()
         reloadList()
     }
 
@@ -233,9 +233,9 @@ class CategoriaListActivity : AppCompatActivity(), CategoriaListAdapter.Categori
     }
 
     override fun onCategoriaListFetched(list: List<CategoriaApi>) {
-        eliminarCategoriasEliminadas(list)
         val categoriasPorInsertar = ArrayList<Categoria>()
         val idCategoriasApi = ArrayList<Int>()
+        eliminarCategoriasEliminadas(list)
         for (categoria in list) {
             val categoriaDB = Categoria(categoria.nombre)
             idCategoriasApi.add(categoria.id)
