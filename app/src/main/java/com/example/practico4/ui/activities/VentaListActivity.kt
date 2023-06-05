@@ -1,7 +1,10 @@
 package com.example.practico4.ui.activities
 
+import android.content.Context
 import android.content.Intent
 import android.icu.util.Calendar
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
@@ -9,14 +12,16 @@ import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.practico4.dal.conn.AppDatabase
 import com.example.practico4.dal.dto.Venta
+import com.example.practico4.dal.dto.VentaProducto
 import com.example.practico4.databinding.ActivityVentaListBinding
-import com.example.practico4.models.VentaApi
+import com.example.practico4.models.*
 import com.example.practico4.repositories.VentaRepository
 import com.example.practico4.ui.adapters.VentaListAdapter
 import java.text.SimpleDateFormat
 
 class VentaListActivity : AppCompatActivity(), VentaListAdapter.VentaListListener,
-    VentaRepository.VentaApiListListener, VentaRepository.VentaApiUpdateListener {
+    VentaRepository.VentaApiListListener, VentaRepository.VentaApiUpdateListener,
+    VentaRepository.VentaApiInsertListener {
 
     private lateinit var binding: ActivityVentaListBinding
     private lateinit var db: AppDatabase
@@ -35,7 +40,9 @@ class VentaListActivity : AppCompatActivity(), VentaListAdapter.VentaListListene
 
     override fun onResume() {
         super.onResume()
-        VentaRepository.fetchListaVentas(this)
+        if (isOnline(this)) {
+            VentaRepository.fetchListaVentas(this)
+        }
         reloadList()
     }
 
@@ -60,6 +67,107 @@ class VentaListActivity : AppCompatActivity(), VentaListAdapter.VentaListListene
         }
     }
 
+    private fun eliminarVentasEliminadas(lista: List<VentaApi>) {
+        val listaIds = lista.map { it.id }
+        val ultimaFechaApi = formatter.parse(lista.last().created_at)
+        DeletedModels.getInstance().deletedVentas.forEach {
+            if (listaIds.contains(it.ventaId)) {
+                val fechaVenta = formatter.parse(it.created_at)
+                if (fechaVenta.before(ultimaFechaApi) || fechaVenta == ultimaFechaApi) {
+                    val venta = it.ventaId?.let { it1 -> db.ventaDao().getById(it1) }
+                    venta?.let { it1 -> VentaRepository.deleteVenta(it1, this, false) }
+                }
+            }
+        }
+        DeletedModels.getInstance().deletedVentas.clear()
+        reloadList()
+    }
+
+    private fun insertVentasPorInsertar(
+        ventasPorInsertar: ArrayList<Venta>,
+        productosPorinsertar: HashMap<Int, List<VentaProducto>>
+    ) {
+        ventasPorInsertar.forEach {
+            val ventaApi = parseToVentaApiInsert(it, productosPorinsertar[it.ventaId]!!)
+            VentaRepository.insertVenta(ventaApi, this)
+        }
+    }
+
+    private fun verificarDeleteInsert(idsVentasApi: ArrayList<Int>, ultimaVentaApi: VentaApi) {
+        val listVentas = db.ventaDao().getVentaByNotIn(idsVentasApi)
+        val ultimaFecha = formatter.parse(ultimaVentaApi.created_at)
+        listVentas.forEach {
+            val fechaVenta = formatter.parse(it.created_at)
+            val productos = db.ventaDao().getVentaProductos(it.ventaId!!)
+            deleteVentaProductos(it)
+            db.ventaDao().delete(it)
+            if (fechaVenta.after(ultimaFecha)) {
+                val ventaApiInsert = parseToVentaApiInsert(it, productos)
+                insertVenta(ventaApiInsert)
+            }
+        }
+    }
+
+    private fun verificarActualizacion(ventaApi: VentaApi, ventadb: Venta) {
+        val fechaApi = formatter.parse(ventaApi.updated_at)
+        val fechaDB = formatter.parse(ventadb.updated_at)
+        if (fechaApi.after(fechaDB)) {
+            ventadb.nombre = ventaApi.nombre
+            ventadb.nit = ventaApi.nit.toLong()
+            ventadb.usuario = ventaApi.usuario
+            ventadb.updated_at = ventaApi.updated_at
+            db.ventaDao().update(ventadb)
+        } else {
+            VentaRepository.updateVenta(ventadb, this, false)
+        }
+    }
+
+    private fun insertVenta(venta: VentaApiInsert) {
+        if (isOnline(this)) {
+            VentaRepository.insertVenta(venta, this)
+        } else {
+            val fecha = Calendar.getInstance().time
+            val ventadb = Venta(
+                venta.nombre,
+                venta.nit.toLong(),
+                venta.usuario
+            )
+            ventadb.created_at = formatter.format(fecha).toString()
+            ventadb.updated_at = formatter.format(fecha).toString()
+            val ventaId = db.ventaDao().insert(ventadb)
+            insertVentaProducto(venta.productos, ventaId)
+        }
+    }
+
+    private fun insertVentaProducto(productos: List<DetalleInsert>, ventaId: Long) {
+        productos.forEach {
+            val ventaProducto = VentaProducto(
+                ventaId.toInt(),
+                it.id,
+                it.cantidad,
+                it.precio
+            )
+            db.ventaDao().insertProductoVendido(ventaProducto)
+        }
+    }
+
+    private fun deleteVenta(venta: Venta) {
+        if (isOnline(this)) {
+            VentaRepository.deleteVenta(venta, this, true)
+        } else {
+            DeletedModels.getInstance().deletedVentas.add(venta)
+            deleteVentaProductos(venta)
+            db.ventaDao().delete(venta)
+        }
+    }
+
+    private fun deleteVentaProductos(venta: Venta) {
+        val productos = venta.ventaId?.let { db.ventaDao().getVentaProductos(it) }
+        productos?.forEach {
+            db.ventaDao().deleteProductoVendido(it)
+        }
+    }
+
     override fun onVentaClick(venta: Venta) {
         val intent = Intent(this, VentaDetailActivity::class.java)
         intent.putExtra("idVenta", venta.ventaId)
@@ -67,12 +175,15 @@ class VentaListActivity : AppCompatActivity(), VentaListAdapter.VentaListListene
     }
 
     override fun onVentaDeleteClick(venta: Venta) {
-        VentaRepository.deleteVenta(venta, this, true)
+        deleteVenta(venta)
     }
 
     override fun onVentaListFetched(ventas: List<VentaApi>) {
         val ventasPorInsertar = ArrayList<Venta>()
+        val ventaProductoPorInsertar = HashMap<Int, List<VentaProducto>>()
         val idsVentasApi = ArrayList<Int>()
+
+        eliminarVentasEliminadas(ventas)
         for (ventaApi in ventas) {
             val ventaDb = Venta(
                 ventaApi.nombre,
@@ -84,6 +195,21 @@ class VentaListActivity : AppCompatActivity(), VentaListAdapter.VentaListListene
             ventaDb.updated_at = ventaApi.updated_at
             idsVentasApi.add(ventaApi.id)
             try {
+                if (db.ventaDao().getAllIds().contains(ventaApi.id)
+                    && db.ventaDao().getVentaProductos(ventaApi.id).size != ventaApi.detalle.size
+                ) {
+                    val productos = ArrayList<DetalleInsert>()
+                    deleteVentaProductos(ventaDb)
+                    ventaApi.detalle.forEach {
+                        val detalle = DetalleInsert(
+                            it.producto.id,
+                            it.cantidad,
+                            it.precio
+                        )
+                        productos.add(detalle)
+                    }
+                    insertVentaProducto(productos, ventaApi.id.toLong())
+                }
                 db.ventaDao().insert(ventaDb)
             } catch (e: Exception) {
                 val ventaPorInsertar = db.ventaDao().getById(ventaApi.id)
@@ -101,42 +227,56 @@ class VentaListActivity : AppCompatActivity(), VentaListAdapter.VentaListListene
                     continue
                 }
 
-                ventaPorInsertar?.let { ventasPorInsertar.add(it) }
+                ventaPorInsertar?.let {
+                    ventasPorInsertar.add(it)
+                    val productos = db.ventaDao().getVentaProductos(it.ventaId!!)
+                    ventaProductoPorInsertar.put(it.ventaId!!, productos)
+                }
                 db.ventaDao().update(ventaDb)
+                updateVentaProductos(ventaDb.ventaId!!, ventaApi.detalle)
             }
         }
 
-        verificarDelete(idsVentasApi)
-        insertProductosPorInsertar(ventasPorInsertar)
+        verificarDeleteInsert(idsVentasApi, ventas.last())
+        insertVentasPorInsertar(ventasPorInsertar, ventaProductoPorInsertar)
         reloadList()
     }
 
-    private fun insertProductosPorInsertar(ventasPorInsertar: ArrayList<Venta>) {
-        ventasPorInsertar.forEach {
-            val fecha = formatter.format(Calendar.getInstance().time).toString()
-            it.created_at = fecha
-            it.updated_at = fecha
-            db.ventaDao().insert(it)
+    private fun updateVentaProductos(ventaId: Int, productos: List<DetalleApi>) {
+        val productosDB = db.ventaDao().getVentaProductos(ventaId)
+        productosDB.forEach {
+            db.ventaDao().deleteProductoVendido(it)
+        }
+        productos.forEach {
+            val ventaProducto = VentaProducto(
+                ventaId,
+                it.producto.id,
+                it.cantidad,
+                it.precio
+            )
+            db.ventaDao().insertProductoVendido(ventaProducto)
         }
     }
 
-    private fun verificarDelete(idsVentasApi: ArrayList<Int>) {
-        val listVentas = db.ventaDao().getVentaByNotIn(idsVentasApi)
-        listVentas.forEach {
-            db.ventaDao().delete(it)
+    private fun parseToVentaApiInsert(
+        venta: Venta,
+        productos: List<VentaProducto>
+    ): VentaApiInsert {
+        val productosApi = ArrayList<DetalleInsert>()
+        productos.forEach {
+            val detalle = DetalleInsert(
+                it.productoId,
+                it.cantidad,
+                it.precio
+            )
+            productosApi.add(detalle)
         }
-    }
-
-    private fun verificarActualizacion(ventaApi: VentaApi, ventadb: Venta) {
-        val fechaApi = formatter.parse(ventaApi.updated_at)
-        val fechaDB = formatter.parse(ventadb.updated_at)
-        if (fechaApi.after(fechaDB)) {
-            ventadb.nombre = ventaApi.nombre
-            ventadb.updated_at = ventaApi.updated_at
-            db.ventaDao().update(ventadb)
-        } else {
-            VentaRepository.updateVenta(ventadb, this, false)
-        }
+        return VentaApiInsert(
+            venta.nombre,
+            venta.nit.toString(),
+            venta.usuario,
+            productosApi
+        )
     }
 
     override fun onVentaListFetchError(error: Throwable) {
@@ -144,10 +284,11 @@ class VentaListActivity : AppCompatActivity(), VentaListAdapter.VentaListListene
     }
 
     override fun onVentaDeleteSuccess(venta: Venta, toast: Boolean) {
+        deleteVentaProductos(venta)
+        db.ventaDao().delete(venta)
+        reloadList()
         if (toast) {
-            db.ventaDao().delete(venta)
             Toast.makeText(this, "Venta eliminada correctamente", Toast.LENGTH_SHORT).show()
-            reloadList()
         }
     }
 
@@ -164,5 +305,50 @@ class VentaListActivity : AppCompatActivity(), VentaListAdapter.VentaListListene
             "VentaListActivity",
             "Ha habido un error al actualizar la venta, error: " + error.message
         )
+    }
+
+    override fun onVentaInsert(venta: VentaApi) {
+        val ventaDb = Venta(
+            venta.nombre,
+            venta.nit.toLong(),
+            venta.usuario
+        )
+        ventaDb.ventaId = venta.id
+        ventaDb.created_at = venta.created_at
+        ventaDb.updated_at = venta.updated_at
+        db.ventaDao().insert(ventaDb)
+        val detalleInsert = List(venta.detalle.size) {
+            DetalleInsert(
+                venta.detalle[it].producto.id,
+                venta.detalle[it].cantidad,
+                venta.detalle[it].precio
+            )
+        }
+        insertVentaProducto(detalleInsert, venta.id.toLong())
+        reloadList()
+    }
+
+    override fun onVentaInsertError(error: Throwable) {
+        TODO("Not yet implemented")
+    }
+
+    private fun isOnline(context: Context): Boolean {
+        val connectivityManager =
+            context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val capabilities =
+            connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
+        if (capabilities != null) {
+            if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
+                Log.i("Internet", "NetworkCapabilities.TRANSPORT_CELLULAR")
+                return true
+            } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                Log.i("Internet", "NetworkCapabilities.TRANSPORT_WIFI")
+                return true
+            } else if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
+                Log.i("Internet", "NetworkCapabilities.TRANSPORT_ETHERNET")
+                return true
+            }
+        }
+        return false
     }
 }

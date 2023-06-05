@@ -75,8 +75,6 @@ class ProductoListActivity : AppCompatActivity(), ProductoListAdapter.ProductoLi
         }
     }
 
-    // Arreglar duplicados al actualizar
-
     private fun eliminarProductosEliminados(lista: List<ProductoApi>) {
         val listaIds = lista.map { it.id }
         val ultimaFechaApi = formatter.parse(lista.last().created_at)
@@ -138,10 +136,8 @@ class ProductoListActivity : AppCompatActivity(), ProductoListAdapter.ProductoLi
             producto.productoId?.let { ProductoRepository.deleteProducto(it, this, false) }
         } else {
             DeletedModels.getInstance().deletedProductos.add(producto)
+            db.productoDao().delete(producto)
         }
-
-        db.productoDao().delete(producto)
-        Toast.makeText(this, "Categoria eliminada correctamente", Toast.LENGTH_SHORT).show()
     }
 
     override fun onProductoClick(producto: ProductoConCategoria) {

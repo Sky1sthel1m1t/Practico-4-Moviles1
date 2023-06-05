@@ -7,5 +7,5 @@ data class VentaApi(
     val usuario: String,
     val created_at: String,
     val updated_at: String,
-    val productos: List<DetalleApi>
+    val detalle: List<DetalleApi>
 )

@@ -31,13 +31,16 @@ interface VentaDao {
     @Query("SELECT * FROM venta WHERE ventaId NOT IN (:ids)")
     fun getVentaByNotIn(ids: List<Int>): List<Venta>
 
+    @Query("SELECT ventaId FROM venta")
+    fun getAllIds(): List<Int>
+
     @Insert
     fun insertProductoVendido(ventaProductos: VentaProducto)
 
     @Update
     fun updateProductoVendido(ventaProductos: VentaProducto)
 
-    @Insert
+    @Delete
     fun deleteProductoVendido(ventaProductos: VentaProducto)
 
     @Insert
