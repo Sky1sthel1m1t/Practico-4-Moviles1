@@ -137,6 +137,7 @@ class ProductoListActivity : AppCompatActivity(), ProductoListAdapter.ProductoLi
         } else {
             DeletedModels.getInstance().deletedProductos.add(producto)
             db.productoDao().delete(producto)
+            Toast.makeText(this, "Producto eliminado correctamente", Toast.LENGTH_SHORT).show()
         }
     }
 

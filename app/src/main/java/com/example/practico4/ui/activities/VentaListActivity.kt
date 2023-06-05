@@ -74,8 +74,7 @@ class VentaListActivity : AppCompatActivity(), VentaListAdapter.VentaListListene
             if (listaIds.contains(it.ventaId)) {
                 val fechaVenta = formatter.parse(it.created_at)
                 if (fechaVenta.before(ultimaFechaApi) || fechaVenta == ultimaFechaApi) {
-                    val venta = it.ventaId?.let { it1 -> db.ventaDao().getById(it1) }
-                    venta?.let { it1 -> VentaRepository.deleteVenta(it1, this, false) }
+                    VentaRepository.deleteVenta(it, this, false)
                 }
             }
         }
@@ -176,6 +175,7 @@ class VentaListActivity : AppCompatActivity(), VentaListAdapter.VentaListListene
 
     override fun onVentaDeleteClick(venta: Venta) {
         deleteVenta(venta)
+        reloadList()
     }
 
     override fun onVentaListFetched(ventas: List<VentaApi>) {
@@ -195,22 +195,18 @@ class VentaListActivity : AppCompatActivity(), VentaListAdapter.VentaListListene
             ventaDb.updated_at = ventaApi.updated_at
             idsVentasApi.add(ventaApi.id)
             try {
-                if (db.ventaDao().getAllIds().contains(ventaApi.id)
-                    && db.ventaDao().getVentaProductos(ventaApi.id).size != ventaApi.detalle.size
-                ) {
-                    val productos = ArrayList<DetalleInsert>()
-                    deleteVentaProductos(ventaDb)
-                    ventaApi.detalle.forEach {
-                        val detalle = DetalleInsert(
-                            it.producto.id,
-                            it.cantidad,
-                            it.precio
-                        )
-                        productos.add(detalle)
-                    }
-                    insertVentaProducto(productos, ventaApi.id.toLong())
-                }
                 db.ventaDao().insert(ventaDb)
+                val productos = ArrayList<DetalleInsert>()
+                deleteVentaProductos(ventaDb)
+                ventaApi.detalle.forEach {
+                    val detalle = DetalleInsert(
+                        it.producto.id,
+                        it.cantidad,
+                        it.precio
+                    )
+                    productos.add(detalle)
+                }
+                insertVentaProducto(productos, ventaApi.id.toLong())
             } catch (e: Exception) {
                 val ventaPorInsertar = db.ventaDao().getById(ventaApi.id)
 
